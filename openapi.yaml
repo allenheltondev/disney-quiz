@@ -1,0 +1,45 @@
+openapi: 3.0.0
+info:
+  title: Disney Quiz API
+  description: Runs a Disney Quiz
+  version: 1.0.0
+
+x-amazon-apigateway-cors:
+  allowOrigins:
+    - '*'
+  allowMethods:
+    - POST
+  allowHeaders:
+    - content-type
+  maxAge: 3600
+
+paths:
+  /quiz:
+    get:
+      summary: Returns an HTML page with the Disney quiz
+      responses:
+        200:
+          description: OK
+          content:
+            text/html:
+              schema:
+                type: string
+        500:
+          $ref: '#/components/responses/InternalServerError'
+
+
+
+components:
+  responses:
+    InternalServerError: #500
+      description: The server encountered an unexpected condition which prevented it from fulfilling the request.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: An error occurred saving the item.
+            required:
+              - message

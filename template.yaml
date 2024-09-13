@@ -1,0 +1,83 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Building a Disney quiz with a single Lambda function
+
+Parameters:
+  MomentoApiKey:
+    Type: String
+    NoEcho: true
+
+Metadata:
+  esbuild-properties: &esbuild-properties
+    Format: esm
+    Minify: true
+    OutExtension:
+      - .js=.mjs
+    Target: es2020
+    Sourcemap: false
+    EntryPoints:
+      - index.mjs
+    Banner:
+      - js=import { createRequire } from 'module'; const require = createRequire(import.meta.url);
+    External:
+      - '@aws-sdk/*'
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Architectures:
+      - arm64
+    Tracing: Active
+    Timeout: 15
+    MemorySize: 1024
+    CodeUri: functions
+    Environment:
+      Variables:
+        AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
+
+Resources:
+  DisneyApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: v1
+      DefinitionBody:
+        'Fn::Transform':
+          Name: AWS::Include
+          Parameters:
+            Location: ./openapi.yaml
+
+  QuizFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        <<: *esbuild-properties
+        EntryPoints:
+          - quiz.mjs
+    Properties:
+      Handler: quiz.handler
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action: bedrock:InvokeModel
+              Resource: '*'
+      Environment:
+        Variables:
+          MOMENTO_API_KEY: !Ref MomentoApiKey
+          CACHE_NAME: game
+          MODEL_ID: 'anthropic.claude-3-haiku-20240307-v1:0'
+      Events:
+        ApiEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DisneyApi
+            Path: /quiz
+            Method: GET
+
+Outputs:
+  ApiBaseUrl:
+    Description: API Gateway endpoint for the community API
+    Value: !Sub 'https://${DisneyApi}.execute-api.${AWS::Region}.amazonaws.com/v1'
